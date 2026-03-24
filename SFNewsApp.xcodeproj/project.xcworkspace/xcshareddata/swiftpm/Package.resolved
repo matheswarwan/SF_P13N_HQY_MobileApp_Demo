@@ -1,0 +1,33 @@
+{
+  "originHash" : "1d743466f3d8bd3655bea5307b62a66cecda1a3166422398ef26aaf2ff11b3d8",
+  "pins" : [
+    {
+      "identity" : "mobile-sdk-cdp-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/salesforce-marketingcloud/mobile-sdk-cdp-ios",
+      "state" : {
+        "revision" : "c5d02dbcebcebd7d088e46611bd3aa5a00ff9781",
+        "version" : "3.0.1"
+      }
+    },
+    {
+      "identity" : "personalization-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/salesforce-marketingcloud/Personalization-IOS",
+      "state" : {
+        "revision" : "eb3faf8a85577f086e976b56cdadaca894745813",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "sfmc-sdk-ios",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/salesforce-marketingcloud/sfmc-sdk-ios",
+      "state" : {
+        "revision" : "b79e7ab104d995d58f3440328be358f2f22477b2",
+        "version" : "3.0.1"
+      }
+    }
+  ],
+  "version" : 3
+}

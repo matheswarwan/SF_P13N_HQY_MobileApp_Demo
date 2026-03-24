@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		941E39562F71E0FA00673F05 /* Cdp in Frameworks */ = {isa = PBXBuildFile; productRef = 941E39552F71E0FA00673F05 /* Cdp */; };
+		941E39592F71E11700673F05 /* Personalization in Frameworks */ = {isa = PBXBuildFile; productRef = 941E39582F71E11700673F05 /* Personalization */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		941E39252F71DF2F00673F05 /* SFNewsApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFNewsApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				941E39562F71E0FA00673F05 /* Cdp in Frameworks */,
+				941E39592F71E11700673F05 /* Personalization in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = SFNewsApp;
 			packageProductDependencies = (
+				941E39552F71E0FA00673F05 /* Cdp */,
+				941E39582F71E11700673F05 /* Personalization */,
 			);
 			productName = SFNewsApp;
 			productReference = 941E39252F71DF2F00673F05 /* SFNewsApp.app */;
@@ -94,6 +103,10 @@
 			);
 			mainGroup = 941E391C2F71DF2F00673F05;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				941E39542F71E0FA00673F05 /* XCRemoteSwiftPackageReference "mobile-sdk-cdp-ios" */,
+				941E39572F71E11700673F05 /* XCRemoteSwiftPackageReference "Personalization-IOS" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 941E39262F71DF2F00673F05 /* Products */;
 			projectDirPath = "";
@@ -328,6 +341,38 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		941E39542F71E0FA00673F05 /* XCRemoteSwiftPackageReference "mobile-sdk-cdp-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/salesforce-marketingcloud/mobile-sdk-cdp-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.1;
+			};
+		};
+		941E39572F71E11700673F05 /* XCRemoteSwiftPackageReference "Personalization-IOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/salesforce-marketingcloud/Personalization-IOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		941E39552F71E0FA00673F05 /* Cdp */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 941E39542F71E0FA00673F05 /* XCRemoteSwiftPackageReference "mobile-sdk-cdp-ios" */;
+			productName = Cdp;
+		};
+		941E39582F71E11700673F05 /* Personalization */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 941E39572F71E11700673F05 /* XCRemoteSwiftPackageReference "Personalization-IOS" */;
+			productName = Personalization;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 941E391D2F71DF2F00673F05 /* Project object */;
 }
