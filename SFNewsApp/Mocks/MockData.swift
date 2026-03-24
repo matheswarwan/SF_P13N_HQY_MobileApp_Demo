@@ -4,10 +4,17 @@ import Foundation
 /// Also used as optimistic placeholder while the SDK call is in flight.
 enum MockData {
 
+    // MARK: - Helpers
+
+    /// Returns a Date offset from today by the given number of days (negative = past).
+    private static func daysAgo(_ days: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+    }
+
     // MARK: - Featured Article (hero banner)
 
     static let featuredArticle = Article(
-        id: "mock-featured-001",
+        id: "a1B2c3D4-5678-9eF0-gH12-iJ34kL56mN78",
         headline: "Maximize Your HSA in 2026: Contribution Limits & Tax Strategies",
         summary: "New IRS limits mean you can save even more in your Health Savings Account this year. Here's how to make the most of it.",
         body: """
@@ -36,7 +43,7 @@ enum MockData {
         """,
         category: "HSA",
         imageURL: URL(string: "https://picsum.photos/seed/hsa2026/800/450"),
-        publishedDate: Date(),
+        publishedDate: daysAgo(1),
         readTimeMinutes: 6,
         isFeatured: true
     )
@@ -45,7 +52,7 @@ enum MockData {
 
     static let forYouArticles: [Article] = [
         Article(
-            id: "mock-feed-001",
+            id: "b7F8e2A1-4c3D-9a0E-bC12-dE56fG78hI90",
             headline: "FSA Eligible Expenses You Didn't Know About",
             summary: "Your Flexible Spending Account covers more than you think — from sunscreen to acupuncture.",
             body: """
@@ -73,12 +80,12 @@ enum MockData {
             """,
             category: "FSA",
             imageURL: URL(string: "https://picsum.photos/seed/fsa/400/300"),
-            publishedDate: Date(),
+            publishedDate: daysAgo(3),
             readTimeMinutes: 4,
             isFeatured: false
         ),
         Article(
-            id: "mock-feed-002",
+            id: "c9D0e1F2-3a4B-5c6D-7e8F-9a0B1c2D3e4F",
             headline: "Open Enrollment Checklist: 5 Steps to Get It Right",
             summary: "Don't rush through open enrollment. Follow these steps to choose the best benefits package for your needs.",
             body: """
@@ -107,12 +114,12 @@ enum MockData {
             """,
             category: "Benefits",
             imageURL: URL(string: "https://picsum.photos/seed/enrollment/400/300"),
-            publishedDate: Date(),
+            publishedDate: daysAgo(5),
             readTimeMinutes: 5,
             isFeatured: false
         ),
         Article(
-            id: "mock-feed-003",
+            id: "d4E5f6G7-8h9I-0j1K-2l3M-4n5O6p7Q8r9S",
             headline: "Investing Your HSA: A Beginner's Guide",
             summary: "Your HSA can double as a retirement account. Learn how to invest for long-term growth.",
             body: """
@@ -141,12 +148,12 @@ enum MockData {
             """,
             category: "Investing",
             imageURL: URL(string: "https://picsum.photos/seed/invest/400/300"),
-            publishedDate: Date(),
+            publishedDate: daysAgo(2),
             readTimeMinutes: 7,
             isFeatured: false
         ),
         Article(
-            id: "mock-feed-004",
+            id: "e1F2g3H4-5i6J-7k8L-9m0N-1o2P3q4R5s6T",
             headline: "Wellness Programs That Actually Work",
             summary: "Evidence-based wellness initiatives that improve employee health and reduce costs.",
             body: """
@@ -176,7 +183,7 @@ enum MockData {
             """,
             category: "Wellness",
             imageURL: URL(string: "https://picsum.photos/seed/wellness/400/300"),
-            publishedDate: Date(),
+            publishedDate: daysAgo(7),
             readTimeMinutes: 5,
             isFeatured: false
         )
@@ -186,7 +193,7 @@ enum MockData {
 
     static let trendingArticles: [Article] = [
         Article(
-            id: "trend-001",
+            id: "f5A6b7C8-9d0E-1f2G-3h4I-5j6K7l8M9n0O",
             headline: "2026 HSA & FSA Contribution Limits at a Glance",
             summary: "Quick reference for this year's IRS contribution limits across all benefit accounts.",
             body: """
@@ -210,12 +217,12 @@ enum MockData {
             """,
             category: "Tax Savings",
             imageURL: nil,
-            publishedDate: Date(),
+            publishedDate: daysAgo(4),
             readTimeMinutes: 3,
             isFeatured: false
         ),
         Article(
-            id: "trend-002",
+            id: "g2B3c4D5-6e7F-8g9H-0i1J-2k3L4m5N6o7P",
             headline: "COBRA: What You Need to Know Before You Leave Your Job",
             summary: "Understanding your COBRA rights ensures continuous health coverage during transitions.",
             body: """
@@ -239,12 +246,12 @@ enum MockData {
             """,
             category: "COBRA",
             imageURL: nil,
-            publishedDate: Date(),
+            publishedDate: daysAgo(6),
             readTimeMinutes: 4,
             isFeatured: false
         ),
         Article(
-            id: "trend-003",
+            id: "h8C9d0E1-2f3G-4h5I-6j7K-8l9M0n1O2p3Q",
             headline: "Commuter Benefits: Save on Your Daily Transit Costs",
             summary: "Pre-tax commuter benefits can save you hundreds of dollars annually on parking and transit.",
             body: """
@@ -271,7 +278,7 @@ enum MockData {
             """,
             category: "Commuter",
             imageURL: nil,
-            publishedDate: Date(),
+            publishedDate: daysAgo(2),
             readTimeMinutes: 5,
             isFeatured: false
         )
