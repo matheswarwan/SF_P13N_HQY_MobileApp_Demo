@@ -22,6 +22,12 @@ final class HomeViewModel: ObservableObject {
     /// Used to show the "Personalized" badge in the UI.
     @Published private(set) var hasPersonalizedContent = false
 
+    // MARK: - Identity UI State
+
+    @Published var showPhoneSignupSheet = false
+    @Published var showProfileSignupSheet = false
+    @Published var identityConfirmationMessage: String? = nil
+
     // MARK: - Dependencies
 
     private let service: PersonalizationService
@@ -61,7 +67,34 @@ final class HomeViewModel: ObservableObject {
         service.trackArticleDetailView(for: article)
     }
 
+    // MARK: - Identity Actions
+
+    func submitEmail(email: String) {
+        service.trackEmailIdentity(email: email)
+        showConfirmation("Email registered!")
+    }
+
+    func submitPhone(phone: String) {
+        service.trackPhoneIdentity(phone: phone)
+        showPhoneSignupSheet = false
+        showConfirmation("Phone number registered!")
+    }
+
+    func submitProfile(email: String, phone: String, firstName: String, lastName: String, zipCode: String) {
+        service.trackFullProfileIdentity(email: email, phone: phone, firstName: firstName, lastName: lastName, zipCode: zipCode)
+        showProfileSignupSheet = false
+        showConfirmation("Profile created!")
+    }
+
     // MARK: - Private
+
+    private func showConfirmation(_ message: String) {
+        identityConfirmationMessage = message
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            identityConfirmationMessage = nil
+        }
+    }
 
     private func showMockFallback() {
         if featuredArticle == nil {

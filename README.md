@@ -25,7 +25,11 @@ SFNewsApp/
 │   ├── ArticleFeedView.swift          # "For You" feed (personalized)
 │   ├── ArticleCardView.swift          # Individual article row
 │   ├── ArticleDetailView.swift        # Full article detail page
-│   └── TrendingView.swift             # Horizontal trending section (static)
+│   ├── TrendingView.swift             # Horizontal trending section (static)
+│   ├── EmailSignupView.swift          # Footer email signup (identity event)
+│   ├── SMSAlertBannerView.swift       # SMS opt-in banner (identity event)
+│   ├── PhoneSignupSheet.swift         # Phone number capture sheet
+│   └── ProfileSignupSheet.swift       # Full profile capture sheet
 └── Mocks/
     └── MockData.swift                 # Fallback content for demo/offline
 ```
@@ -34,6 +38,7 @@ SFNewsApp/
 
 - **Salesforce Einstein Personalization** — Fetches real-time personalized content decisions for the home screen hero banner and "For You" feed
 - **Data Cloud Event Tracking** — Sends page views, impressions, clicks, and article detail views to Salesforce Data Cloud
+- **Identity Event Capture** — Collects email, phone, and full profile via 3 UI surfaces and sends identity events to Data Cloud
 - **Implicit Consent** — Automatically opts in for CDP consent so events flow immediately
 - **Mock Fallback** — Displays HealthEquity-themed content when the SDK is unavailable or still initializing
 - **Navigation** — All articles are tappable and navigate to a full detail page
@@ -94,6 +99,16 @@ All events are sent to Salesforce Data Cloud via `SFMCSdk.track(event:)`.
 | **Article Click** | `ViewCatalogObjectDetailEvent` | User taps an article card | `CatalogObject(type: "Article", id, headline, category)` |
 | **Article Detail View** | `CustomEvent("ArticleDetailView")` | Detail page loads | `articleId, headline, category` |
 
+### Identity Events
+
+These events create known identity profiles in Salesforce Data Cloud. Each uses both `SFMCSdk.identity.edit` (persistent profile) and `SFMCSdk.track(event: IdentityEvent(...))` (tracked to CDP).
+
+| Event | Trigger (UI Surface) | SDK Calls | Data Sent |
+|-------|---------------------|-----------|-----------|
+| **Email Identity** | Email signup footer at bottom of home screen | `identity.edit { profileId = email }` + `IdentityEvent` | `contactPointEmail`, `source` |
+| **Phone Identity** | SMS alert banner → phone sheet | `identity.edit { phone attribute }` + `IdentityEvent` | `contactPointPhone`, `source` |
+| **Full Profile Identity** | Toolbar profile icon → profile sheet | `identity.edit { profileId + all attributes }` + `IdentityEvent` | `contactPointEmail`, `contactPointPhone`, `firstName`, `lastName`, `zipCode`, `source` |
+
 ### Automatic Events (via CDP module config)
 
 | Event | Source |
@@ -121,6 +136,33 @@ Filter the Xcode console by `PersonalizationService` or `SFNewsApp` to see:
 [PersonalizationService] Tracked impression for article: a1B2c3D4-...
 [PersonalizationService] Tracked click for article: b7F8e2A1-...
 [PersonalizationService] Tracked ArticleDetailView for article: b7F8e2A1-...
+```
+
+Identity event logs show the full data payload being sent:
+```
+[PersonalizationService] --- EMAIL IDENTITY EVENT ---
+[PersonalizationService]   Setting profileId = user@example.com
+[PersonalizationService]   Setting attribute: email = user@example.com
+[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit
+[PersonalizationService]   ✓ IdentityEvent tracked with attributes: ["contactPointEmail": "user@example.com", "source": "email_signup_footer"]
+[PersonalizationService] --- END EMAIL IDENTITY ---
+
+[PersonalizationService] --- PHONE IDENTITY EVENT ---
+[PersonalizationService]   Setting attribute: phone = +15551234567
+[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit
+[PersonalizationService]   ✓ IdentityEvent tracked with attributes: ["contactPointPhone": "+15551234567", "source": "sms_signup_sheet"]
+[PersonalizationService] --- END PHONE IDENTITY ---
+
+[PersonalizationService] --- FULL PROFILE IDENTITY EVENT ---
+[PersonalizationService]   Setting profileId = user@example.com
+[PersonalizationService]   Setting attribute: email     = user@example.com
+[PersonalizationService]   Setting attribute: phone     = +15551234567
+[PersonalizationService]   Setting attribute: firstName = Jane
+[PersonalizationService]   Setting attribute: lastName  = Doe
+[PersonalizationService]   Setting attribute: zipCode   = 84003
+[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit
+[PersonalizationService]   ✓ IdentityEvent tracked with attributes: ["contactPointEmail": "user@example.com", "contactPointPhone": "+15551234567", "firstName": "Jane", "lastName": "Doe", "zipCode": "84003", "source": "profile_signup_sheet"]
+[PersonalizationService] --- END FULL PROFILE IDENTITY ---
 ```
 
 Debug logging is enabled in `AppDelegate` via `SFMCSdk.setLogger(logLevel: .debug)` for DEBUG builds.

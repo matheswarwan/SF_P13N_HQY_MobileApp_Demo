@@ -113,4 +113,100 @@ final class PersonalizationService {
         SFMCSdk.track(event: event)
         print("[PersonalizationService] Tracked ArticleDetailView for article: \(article.id)")
     }
+
+    // MARK: - Identity Tracking
+
+    /// Tracks email identity — sets email as profileId and sends a contact point email event.
+    func trackEmailIdentity(email: String) {
+        guard isSDKReady else {
+            print("[PersonalizationService] ⚠️ SDK not ready — skipping EmailIdentity event")
+            return
+        }
+
+        print("[PersonalizationService] --- EMAIL IDENTITY EVENT ---")
+        print("[PersonalizationService]   Setting profileId = \(email)")
+        print("[PersonalizationService]   Setting attribute: email = \(email)")
+
+        SFMCSdk.identity.edit { modifier in
+            modifier.profileId = email
+            modifier.addAttribute(key: "email", value: email)
+            return modifier
+        }
+        print("[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit")
+
+        let attributes: [String: Any] = [
+            "contactPointEmail": email,
+            "source": "email_signup_footer"
+        ]
+        let event = IdentityEvent(attributes: attributes)
+        SFMCSdk.track(event: event)
+        print("[PersonalizationService]   ✓ IdentityEvent tracked with attributes: \(attributes)")
+        print("[PersonalizationService] --- END EMAIL IDENTITY ---")
+    }
+
+    /// Tracks phone identity — adds phone attribute and sends a contact point phone event.
+    func trackPhoneIdentity(phone: String) {
+        guard isSDKReady else {
+            print("[PersonalizationService] ⚠️ SDK not ready — skipping PhoneIdentity event")
+            return
+        }
+
+        print("[PersonalizationService] --- PHONE IDENTITY EVENT ---")
+        print("[PersonalizationService]   Setting attribute: phone = \(phone)")
+
+        SFMCSdk.identity.edit { modifier in
+            modifier.addAttribute(key: "phone", value: phone)
+            return modifier
+        }
+        print("[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit")
+
+        let attributes: [String: Any] = [
+            "contactPointPhone": phone,
+            "source": "sms_signup_sheet"
+        ]
+        let event = IdentityEvent(attributes: attributes)
+        SFMCSdk.track(event: event)
+        print("[PersonalizationService]   ✓ IdentityEvent tracked with attributes: \(attributes)")
+        print("[PersonalizationService] --- END PHONE IDENTITY ---")
+    }
+
+    /// Tracks full profile identity — sets all profile attributes and sends a party identification event.
+    func trackFullProfileIdentity(email: String, phone: String, firstName: String, lastName: String, zipCode: String) {
+        guard isSDKReady else {
+            print("[PersonalizationService] ⚠️ SDK not ready — skipping FullProfileIdentity event")
+            return
+        }
+
+        print("[PersonalizationService] --- FULL PROFILE IDENTITY EVENT ---")
+        print("[PersonalizationService]   Setting profileId = \(email)")
+        print("[PersonalizationService]   Setting attribute: email     = \(email)")
+        print("[PersonalizationService]   Setting attribute: phone     = \(phone)")
+        print("[PersonalizationService]   Setting attribute: firstName = \(firstName)")
+        print("[PersonalizationService]   Setting attribute: lastName  = \(lastName)")
+        print("[PersonalizationService]   Setting attribute: zipCode   = \(zipCode)")
+
+        SFMCSdk.identity.edit { modifier in
+            modifier.profileId = email
+            modifier.addAttribute(key: "email", value: email)
+            modifier.addAttribute(key: "phone", value: phone)
+            modifier.addAttribute(key: "firstName", value: firstName)
+            modifier.addAttribute(key: "lastName", value: lastName)
+            modifier.addAttribute(key: "zipCode", value: zipCode)
+            return modifier
+        }
+        print("[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit")
+
+        let attributes: [String: Any] = [
+            "contactPointEmail": email,
+            "contactPointPhone": phone,
+            "firstName": firstName,
+            "lastName": lastName,
+            "zipCode": zipCode,
+            "source": "profile_signup_sheet"
+        ]
+        let event = IdentityEvent(attributes: attributes)
+        SFMCSdk.track(event: event)
+        print("[PersonalizationService]   ✓ IdentityEvent tracked with attributes: \(attributes)")
+        print("[PersonalizationService] --- END FULL PROFILE IDENTITY ---")
+    }
 }

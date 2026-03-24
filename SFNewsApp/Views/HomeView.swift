@@ -23,6 +23,14 @@ struct HomeView: View {
                     // Section 3: Static trending content (no p13n)
                     sectionHeader(title: "Trending", isPersonalized: false)
                     TrendingView()
+                        .padding(.bottom, 20)
+
+                    // SMS alert banner
+                    SMSAlertBannerView()
+                        .padding(.bottom, 28)
+
+                    // Email signup footer
+                    EmailSignupView()
                         .padding(.bottom, 40)
                 }
             }
@@ -31,6 +39,39 @@ struct HomeView: View {
             }
             .navigationTitle("HealthEquity")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        viewModel.showProfileSignupSheet = true
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                    }
+                    .tint(HETheme.primaryGreen)
+                }
+            }
+            .sheet(isPresented: $viewModel.showPhoneSignupSheet) {
+                PhoneSignupSheet()
+                    .environmentObject(viewModel)
+            }
+            .sheet(isPresented: $viewModel.showProfileSignupSheet) {
+                ProfileSignupSheet()
+                    .environmentObject(viewModel)
+            }
+            .overlay(alignment: .bottom) {
+                if let message = viewModel.identityConfirmationMessage {
+                    Text(message)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(HETheme.primaryGreen)
+                        .clipShape(Capsule())
+                        .shadow(radius: 4)
+                        .padding(.bottom, 32)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.easeInOut, value: viewModel.identityConfirmationMessage)
+                }
+            }
             .task {
                 // Fires once on first appearance; re-fires only if the task is cancelled and restarted.
                 await viewModel.loadContent()

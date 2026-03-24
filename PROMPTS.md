@@ -113,6 +113,29 @@ This document captures the sequence of prompts given to **Claude Code** (Anthrop
 
 ---
 
+## 13. Add Identity Event Capture
+
+> Why are only behavioural events generated and no contact point phone, email, address or party identification or identity events? We probably need to setup a footer signup form to get email, popup to get phone and signup to get email, phone, address together.
+
+**What it did:** Identified that the app was only sending behavioral events (impressions, clicks, page views) but no identity events to create known profiles in CDP. Implemented 3 identity capture UI surfaces:
+- **Email signup footer** (`EmailSignupView`) — inline green-themed row at the bottom of the home scroll with email field + "Subscribe" button
+- **SMS alert banner + phone sheet** (`SMSAlertBannerView` + `PhoneSignupSheet`) — tappable banner below trending that opens a modal sheet for phone number collection
+- **Profile signup sheet** (`ProfileSignupSheet`) — accessible via toolbar profile icon, collects first name, last name, email, phone, and zip code
+
+Each surface calls through `PersonalizationService` which uses:
+- `SFMCSdk.identity.edit { modifier in ... }` to set persistent profile attributes (profileId, email, phone, firstName, lastName, zipCode)
+- `SFMCSdk.track(event: IdentityEvent(attributes: [...]))` to send the identity event to Data Cloud with contact point and party identification data
+
+---
+
+## 14. Improve Identity Event Logging + Update Documentation
+
+> Looks like the name, email, phone or postal code are not being sent to data cloud. Can you print some better console logs to know that these are being sent? Also, add these details to MD file.
+
+**What it did:** Enhanced all 3 identity tracking methods with detailed structured console logs that show every attribute being set and every event being tracked. Each identity method now prints a clear block with `---` delimiters, individual attribute lines, and confirmation of both `identity.edit` and `IdentityEvent` calls. Updated `README.md` with the new identity events table, updated architecture tree with 4 new view files, and added full example console output for each identity event type. Updated `PROMPTS.md` with both identity-related prompts.
+
+---
+
 ## Tools Used
 
 - **Claude Code** (Anthropic) — AI coding assistant running inside Xcode via Claude Agent SDK
