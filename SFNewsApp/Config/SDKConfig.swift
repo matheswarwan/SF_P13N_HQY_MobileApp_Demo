@@ -12,7 +12,7 @@ enum SDKConfig {
     // MARK: - Personalization Point Names
     // Must match exactly what is configured in the Salesforce Einstein Personalization UI
     // under Personalization > Personalization Points
-    static let featuredStoryPoint = "ios.news.home.featured_story"
+    static let featuredStoryPoint = "Home_Hero_Test"
     static let forYouFeedPoint    = "ios.news.home.for_you_feed"
 
     // MARK: - Fetch Settings

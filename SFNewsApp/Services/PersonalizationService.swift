@@ -41,14 +41,29 @@ final class PersonalizationService {
         }
 
         do {
+            let pointNames = [SDKConfig.featuredStoryPoint, SDKConfig.forYouFeedPoint]
+            print("[PersonalizationService] --- FETCH DECISIONS ---")
+            print("[PersonalizationService]   Requesting points: \(pointNames)")
+
             let response = try await PersonalizationModule.fetchDecisions(
-                personalizationPointNames: [
-                    SDKConfig.featuredStoryPoint,
-                    SDKConfig.forYouFeedPoint
-                ],
+                personalizationPointNames: pointNames,
                 context: nil,
                 timeoutSeconds: SDKConfig.fetchTimeoutSeconds
             )
+
+            // Log raw response for debugging
+            print("[PersonalizationService]   Response received. Personalization points returned: \(Array(response.personalizationsByName.keys))")
+            for (pointName, personalization) in response.personalizationsByName {
+                print("[PersonalizationService]   --- Point: \(pointName) ---")
+                print("[PersonalizationService]     personalizationId: \(personalization.personalizationId)")
+                print("[PersonalizationService]     attributes: \(personalization.attributes)")
+                print("[PersonalizationService]     data count: \(personalization.data.count)")
+                for (index, item) in personalization.data.enumerated() {
+                    print("[PersonalizationService]     data[\(index)]: \(item)")
+                }
+            }
+            print("[PersonalizationService] --- END FETCH DECISIONS ---")
+
             return PersonalizationDecisionParser.parse(response: response)
         } catch {
             print("[PersonalizationService] fetchDecisions error: \(error)")

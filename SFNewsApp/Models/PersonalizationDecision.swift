@@ -47,19 +47,35 @@ enum PersonalizationDecisionParser {
 
     /// Parse a single-item personalization (featured story hero).
     /// The SDK returns the item data in the `attributes` dictionary.
+    /// Accepts both "imageUrl" and "imageURL" key variants.
     private static func parseSingleItem(from personalization: DecisionsResponsePersonalization) -> PersonalizedArticle? {
         let attrs = personalization.attributes
-        guard let headline = attrs["headline"] as? String else { return nil }
 
-        return PersonalizedArticle(
+        // Accept both key variants for image URL
+        let imageURLString = attrs["imageUrl"] as? String
+            ?? attrs["imageURL"] as? String
+            ?? (attrs["imageURL"] as? URL)?.absoluteString
+
+        // headline is preferred but not strictly required — use fallback for image-only experiments
+        let headline = attrs["headline"] as? String ?? attrs["title"] as? String ?? ""
+
+        // If we have neither headline nor image, there's nothing to show
+        guard !headline.isEmpty || imageURLString != nil else {
+            print("[PersonalizationParser] Skipping item — no headline or imageURL found in attributes: \(Array(attrs.keys))")
+            return nil
+        }
+
+        let article = PersonalizedArticle(
             id: personalization.personalizationId,
-            headline: headline,
-            summary: attrs["summary"] as? String ?? "",
+            headline: headline.isEmpty ? "Featured" : headline,
+            summary: attrs["summary"] as? String ?? attrs["description"] as? String ?? "",
             body: attrs["body"] as? String ?? "",
-            category: attrs["category"] as? String ?? "News",
-            imageURL: (attrs["imageUrl"] as? String).flatMap(URL.init),
+            category: attrs["category"] as? String ?? "Featured",
+            imageURL: imageURLString.flatMap(URL.init),
             readTimeMinutes: attrs["readTimeMinutes"] as? Int ?? 3
         )
+        print("[PersonalizationParser] Parsed featured article: headline=\"\(article.headline)\", imageURL=\(article.imageURL?.absoluteString ?? "nil")")
+        return article
     }
 
     /// Parse a multi-item personalization (for-you feed).
