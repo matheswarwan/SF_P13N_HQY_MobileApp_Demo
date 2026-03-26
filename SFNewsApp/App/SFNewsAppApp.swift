@@ -7,13 +7,26 @@ struct SFNewsAppApp: App {
     // before any SwiftUI view body is evaluated.
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    // Single shared ViewModel injected into the environment for all child views.
+    // Auth state — root of the auth EnvironmentObject tree
+    @StateObject private var authViewModel = AuthViewModel()
+
+    // Home state — only active once the user is logged in
     @StateObject private var homeViewModel = HomeViewModel()
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
-                .environmentObject(homeViewModel)
+            if authViewModel.isLoggedIn {
+                HomeView()
+                    .environmentObject(homeViewModel)
+                    .environmentObject(authViewModel)
+                    // Re-fetch personalized content whenever the logged-in user changes
+                    .task(id: authViewModel.currentUser?.id) {
+                        await homeViewModel.loadContent()
+                    }
+            } else {
+                LoginView()
+                    .environmentObject(authViewModel)
+            }
         }
     }
 }

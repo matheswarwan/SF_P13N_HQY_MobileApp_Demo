@@ -5,6 +5,7 @@ import SwiftUI
 struct HomeView: View {
 
     @EnvironmentObject var viewModel: HomeViewModel
+    @EnvironmentObject var authViewModel: AuthViewModel
 
     var body: some View {
         NavigationStack {
@@ -41,12 +42,25 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        viewModel.showProfileSignupSheet = true
+                    Menu {
+                        if let user = authViewModel.currentUser {
+                            Text(user.displayName)
+                        }
+                        Divider()
+                        Button {
+                            viewModel.showProfileSignupSheet = true
+                        } label: {
+                            Label("Update Profile", systemImage: "person.crop.circle")
+                        }
+                        Button(role: .destructive) {
+                            authViewModel.logout()
+                        } label: {
+                            Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                        }
                     } label: {
                         Image(systemName: "person.crop.circle")
+                            .tint(HETheme.primaryGreen)
                     }
-                    .tint(HETheme.primaryGreen)
                 }
             }
             .sheet(isPresented: $viewModel.showPhoneSignupSheet) {
@@ -106,4 +120,5 @@ struct HomeView: View {
 #Preview {
     HomeView()
         .environmentObject(HomeViewModel())
+        .environmentObject(AuthViewModel())
 }

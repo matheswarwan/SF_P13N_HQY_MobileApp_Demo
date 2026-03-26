@@ -1,6 +1,7 @@
 import Foundation
 import Personalization
 import SFMCSDK
+import Cdp
 
 /// Wraps the Salesforce Einstein Personalization SDK's `fetchDecisions` API.
 ///
@@ -127,6 +128,49 @@ final class PersonalizationService {
         ) else { return }
         SFMCSdk.track(event: event)
         print("[PersonalizationService] Tracked ArticleDetailView for article: \(article.id)")
+    }
+
+    // MARK: - Auth Identity Management
+
+    /// Sets the Salesforce identity profile for a logged-in local user.
+    func setUserIdentity(user: UserAccount) {
+        guard isSDKReady else {
+            print("[PersonalizationService] SDK not ready — skipping setUserIdentity")
+            return
+        }
+
+        print("[PersonalizationService] --- SET USER IDENTITY ---")
+        print("[PersonalizationService]   profileId  = \(user.email)")
+        print("[PersonalizationService]   firstName  = \(user.firstName)")
+        print("[PersonalizationService]   lastName   = \(user.lastName)")
+
+        SFMCSdk.identity.edit { modifier in
+            modifier.profileId = user.email
+            modifier.addAttribute(key: "email", value: user.email)
+            if !user.firstName.isEmpty {
+                modifier.addAttribute(key: "firstName", value: user.firstName)
+            }
+            if !user.lastName.isEmpty {
+                modifier.addAttribute(key: "lastName", value: user.lastName)
+            }
+            return modifier
+        }
+        print("[PersonalizationService]   ✓ identity.edit complete")
+
+        var attributes: [String: Any] = ["contactPointEmail": user.email, "source": "local_auth_login"]
+        if !user.firstName.isEmpty { attributes["firstName"] = user.firstName }
+        if !user.lastName.isEmpty  { attributes["lastName"]  = user.lastName  }
+        let event = IdentityEvent(attributes: attributes)
+        SFMCSdk.track(event: event)
+        print("[PersonalizationService]   ✓ IdentityEvent tracked: \(attributes)")
+        print("[PersonalizationService] --- END SET USER IDENTITY ---")
+    }
+
+    /// Clears the current identity, reverting to anonymous. Called on logout.
+    func clearIdentity() {
+        guard isSDKReady else { return }
+        CdpModule.shared.setProfileToAnonymous()
+        print("[PersonalizationService] ✓ CDP profile set to anonymous (logout)")
     }
 
     // MARK: - Identity Tracking

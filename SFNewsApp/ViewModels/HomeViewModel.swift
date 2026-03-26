@@ -42,6 +42,7 @@ final class HomeViewModel: ObservableObject {
     /// Safe to call on `.task {}` and `.refreshable {}`.
     func loadContent() async {
         isLoading = true
+        resetContent()
         showMockFallback()
 
         service.trackHomePageView()
@@ -87,6 +88,13 @@ final class HomeViewModel: ObservableObject {
     }
 
     // MARK: - Private
+
+    /// Clears cached content so the next loadContent() starts fresh (e.g., on user switch).
+    private func resetContent() {
+        featuredArticle = nil
+        forYouArticles = []
+        hasPersonalizedContent = false
+    }
 
     private func showConfirmation(_ message: String) {
         identityConfirmationMessage = message
