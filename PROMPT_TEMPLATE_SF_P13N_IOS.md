@@ -12,6 +12,9 @@ I have an existing SwiftUI iOS app and I want to integrate **Salesforce Einstein
 2. **Track behavioral events** (page views, impressions, clicks, article detail views) to Salesforce Data Cloud
 3. **Capture identity events** (email, phone, full profile) via UI forms to create known profiles in Data Cloud
 4. **Set implicit consent** so events flow immediately (demo/dev mode)
+5. **Local multi-user authentication** — users can create accounts, log in/out, and switch users; each login sends identity to Data Cloud
+6. **Profile editing** — editable profile screen with personal info, gender, and marketing preference toggles
+7. **Consent event tracking** — marketing preferences sent as `consentLog` events using Salesforce's consent schema (purpose / status / provider)
 
 Below is the complete technical specification. Follow it exactly.
 
@@ -173,7 +176,7 @@ class AppDelegate: NSObject, UIApplicationDelegate {
 
 ### 3B. App Entry Point
 
-In your `@main` App struct, add the delegate adaptor and inject the ViewModel:
+In your `@main` App struct, add the delegate adaptor. The root view conditionally shows `LoginView` or `HomeView` based on auth state. On user switch, content reloads automatically:
 
 ```swift
 import SwiftUI
@@ -182,15 +185,29 @@ import SwiftUI
 struct YourApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var homeViewModel = HomeViewModel()
+    @StateObject private var authViewModel = AuthViewModel()
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
-                .environmentObject(homeViewModel)
+            Group {
+                if authViewModel.isLoggedIn {
+                    HomeView()
+                        .environmentObject(homeViewModel)
+                        .environmentObject(authViewModel)
+                        .task(id: authViewModel.currentUser?.id) {
+                            await homeViewModel.loadContent()
+                        }
+                } else {
+                    LoginView()
+                        .environmentObject(authViewModel)
+                }
+            }
         }
     }
 }
 ```
+
+> **Key pattern**: `.task(id: authViewModel.currentUser?.id)` re-triggers whenever the user changes (login, logout, or switch account), so the home screen always reloads with the new identity's personalized content.
 
 ---
 
@@ -415,62 +432,128 @@ final class PersonalizationService {
         print("[PersonalizationService] Tracked ArticleDetailView: \(article.id)")
     }
 
-    // MARK: - Identity Event Tracking
+    // MARK: - Auth Identity Management
+
+    /// Sets the Salesforce identity profile for a logged-in local user.
+    /// Called on login, signup, and profile update.
+    ///
+    /// IMPORTANT SCHEMA KEY MAPPING:
+    /// - Phone must be "phoneNumber" (NOT "phone")
+    /// - Zip code must be "postalCode" (NOT "zipCode")
+    /// - Gender uses "Gender" (capital G — custom field, must be added to your data stream schema)
+    func setUserIdentity(user: UserAccount) {
+        guard isSDKReady else { return }
+        print("[PersonalizationService] --- SET USER IDENTITY ---")
+        SFMCSdk.identity.edit { modifier in
+            modifier.profileId = user.email
+            modifier.addAttribute(key: "email", value: user.email)
+            if !user.firstName.isEmpty { modifier.addAttribute(key: "firstName", value: user.firstName) }
+            if !user.lastName.isEmpty  { modifier.addAttribute(key: "lastName",  value: user.lastName) }
+            if !user.phone.isEmpty     { modifier.addAttribute(key: "phoneNumber", value: user.phone) }
+            if !user.zipCode.isEmpty   { modifier.addAttribute(key: "postalCode",  value: user.zipCode) }
+            if !user.gender.isEmpty    { modifier.addAttribute(key: "Gender",      value: user.gender) }
+            return modifier
+        }
+        var attrs: [String: Any] = ["contactPointEmail": user.email, "source": "local_auth_login"]
+        if !user.phone.isEmpty   { attrs["phoneNumber"] = user.phone }
+        if !user.zipCode.isEmpty { attrs["postalCode"]  = user.zipCode }
+        if !user.gender.isEmpty  { attrs["Gender"]      = user.gender }
+        SFMCSdk.track(event: IdentityEvent(attributes: attrs))
+        print("[PersonalizationService] --- END SET USER IDENTITY ---")
+    }
+
+    /// Clears the current identity, reverting to anonymous. Called on logout.
+    /// IMPORTANT: Use CdpModule.shared — NOT SFMCSdk.cdp (which has no setProfileToAnonymous).
+    func clearIdentity() {
+        guard isSDKReady else { return }
+        CdpModule.shared.setProfileToAnonymous()
+        print("[PersonalizationService] ✓ CDP profile set to anonymous (logout)")
+    }
+
+    // MARK: - Identity Event Tracking (UI Forms)
 
     func trackEmailIdentity(email: String) {
         guard isSDKReady else { return }
-        print("[PersonalizationService] --- EMAIL IDENTITY ---")
-        print("[PersonalizationService]   profileId = \(email)")
         SFMCSdk.identity.edit { modifier in
             modifier.profileId = email
             modifier.addAttribute(key: "email", value: email)
             return modifier
         }
-        let attrs: [String: Any] = ["contactPointEmail": email, "source": "email_signup"]
-        SFMCSdk.track(event: IdentityEvent(attributes: attrs))
-        print("[PersonalizationService]   IdentityEvent sent: \(attrs)")
-        print("[PersonalizationService] --- END EMAIL IDENTITY ---")
+        SFMCSdk.track(event: IdentityEvent(attributes: [
+            "contactPointEmail": email, "source": "email_signup"
+        ]))
     }
 
     func trackPhoneIdentity(phone: String) {
         guard isSDKReady else { return }
-        print("[PersonalizationService] --- PHONE IDENTITY ---")
-        print("[PersonalizationService]   phone = \(phone)")
         SFMCSdk.identity.edit { modifier in
-            modifier.addAttribute(key: "phone", value: phone)
+            modifier.addAttribute(key: "phoneNumber", value: phone)  // NOT "phone"
             return modifier
         }
-        let attrs: [String: Any] = ["contactPointPhone": phone, "source": "sms_signup"]
-        SFMCSdk.track(event: IdentityEvent(attributes: attrs))
-        print("[PersonalizationService]   IdentityEvent sent: \(attrs)")
-        print("[PersonalizationService] --- END PHONE IDENTITY ---")
+        SFMCSdk.track(event: IdentityEvent(attributes: [
+            "phoneNumber": phone, "source": "sms_signup"  // NOT "contactPointPhone"
+        ]))
     }
 
-    func trackFullProfileIdentity(email: String, phone: String, firstName: String, lastName: String, zipCode: String) {
+    func trackFullProfileIdentity(email: String, phone: String, firstName: String,
+                                   lastName: String, zipCode: String) {
         guard isSDKReady else { return }
-        print("[PersonalizationService] --- FULL PROFILE IDENTITY ---")
-        print("[PersonalizationService]   profileId = \(email)")
-        print("[PersonalizationService]   firstName=\(firstName), lastName=\(lastName), phone=\(phone), zip=\(zipCode)")
         SFMCSdk.identity.edit { modifier in
             modifier.profileId = email
             modifier.addAttribute(key: "email", value: email)
-            modifier.addAttribute(key: "phone", value: phone)
+            modifier.addAttribute(key: "phoneNumber", value: phone)   // NOT "phone"
             modifier.addAttribute(key: "firstName", value: firstName)
             modifier.addAttribute(key: "lastName", value: lastName)
-            modifier.addAttribute(key: "zipCode", value: zipCode)
+            modifier.addAttribute(key: "postalCode", value: zipCode)  // NOT "zipCode"
             return modifier
         }
-        let attrs: [String: Any] = [
-            "contactPointEmail": email, "contactPointPhone": phone,
-            "firstName": firstName, "lastName": lastName, "zipCode": zipCode,
-            "source": "profile_signup"
+        SFMCSdk.track(event: IdentityEvent(attributes: [
+            "contactPointEmail": email, "phoneNumber": phone,
+            "firstName": firstName, "lastName": lastName,
+            "postalCode": zipCode, "source": "profile_signup"
+        ]))
+    }
+
+    // MARK: - Consent / Preference Tracking
+
+    /// Sends consent events for each marketing preference using Salesforce's consentLog schema.
+    /// Each preference maps to: purpose (what), status ("Opt In" / "Opt Out"), provider (app name).
+    ///
+    /// This follows the official consent schema:
+    /// https://developer.salesforce.com/docs/data/data-cloud-engagement-mobile-sdk/guide/c360a-api-engagement-mobile-sdk-consent-schema.html
+    func trackPreferenceUpdate(user: UserAccount) {
+        guard isSDKReady else { return }
+        let preferences: [(purpose: String, optedIn: Bool)] = [
+            ("Marketing Email",    user.marketingEmailOptIn),
+            ("Push Notifications", user.marketingPushOptIn),
+            ("SMS Marketing",      user.marketingSmsOptIn),
+            ("Weekly Digest",      user.weeklyDigestOptIn),
+            ("Benefit Alerts",     user.benefitAlertsOptIn),
         ]
-        SFMCSdk.track(event: IdentityEvent(attributes: attrs))
-        print("[PersonalizationService]   IdentityEvent sent: \(attrs)")
-        print("[PersonalizationService] --- END FULL PROFILE IDENTITY ---")
+        for pref in preferences {
+            let status = pref.optedIn ? "Opt In" : "Opt Out"
+            if let event = CustomEvent(name: "consentLog", attributes: [
+                "purpose": pref.purpose,
+                "status": status,
+                "provider": "HealthEquity Mobile App"
+            ]) {
+                SFMCSdk.track(event: event)
+            }
+        }
     }
 }
 ```
+
+> **Schema key mapping** — these must match the Data Cloud engagement data stream schema exactly:
+>
+> | App concept | Correct SDK key | Wrong (will NOT map) |
+> |---|---|---|
+> | Phone number | `phoneNumber` | `phone`, `contactPointPhone` |
+> | Postal / Zip code | `postalCode` | `zipCode` |
+> | Gender | `Gender` (custom — add to schema) | `gender` |
+> | Email | `email` / `contactPointEmail` | ✓ (both work) |
+>
+> **Imports required**: `import Cdp` is needed for `CdpModule.shared.setProfileToAnonymous()`. Without it, you'll get a compile error — `SFMCSdk.cdp` does NOT expose this method.
 
 ---
 
@@ -508,6 +591,7 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Load Content
 
     func loadContent() async {
+        resetContent()               // Clear stale content (important on user switch)
         isLoading = true
         showMockFallback()           // Show defaults immediately
         service.trackHomePageView()  // Track page view
@@ -516,6 +600,14 @@ final class HomeViewModel: ObservableObject {
         apply(decisions)             // Replace with personalized content if available
 
         isLoading = false
+    }
+
+    /// Resets all content state. Called at the top of loadContent() so that switching
+    /// users starts with a clean slate instead of showing the previous user's content.
+    func resetContent() {
+        featuredArticle = nil
+        forYouArticles = []
+        hasPersonalizedContent = false
     }
 
     // MARK: - Event Tracking Pass-throughs
@@ -618,13 +710,32 @@ NavigationStack {
 ### HomeView wiring checklist:
 - [ ] Wrap content in `NavigationStack`
 - [ ] Add `.navigationDestination(for: Article.self)` for detail page routing
-- [ ] Add `.task { await viewModel.loadContent() }` for initial data load
 - [ ] Add `.refreshable { await viewModel.loadContent() }` for pull-to-refresh
-- [ ] Add toolbar button for profile sheet: `Image(systemName: "person.crop.circle")`
+- [ ] Add `@EnvironmentObject var authViewModel: AuthViewModel`
+- [ ] Add toolbar `Menu` with current user display name, "View Profile" action, and "Sign Out" action
+- [ ] Add `.sheet(isPresented: $viewModel.showProfileView)` for ProfileView (NOT old ProfileSignupSheet)
 - [ ] Add `SMSAlertBannerView()` in scroll content
 - [ ] Add `EmailSignupView()` at bottom of scroll content
 - [ ] Add `.sheet(isPresented: $viewModel.showPhoneSignupSheet) { PhoneSignupSheet() }`
-- [ ] Add `.sheet(isPresented: $viewModel.showProfileSignupSheet) { ProfileSignupSheet() }`
+
+**Toolbar Menu pattern** — replaces the old single toolbar button:
+```swift
+.toolbar {
+    ToolbarItem(placement: .topBarTrailing) {
+        Menu {
+            if let user = authViewModel.currentUser {
+                Text(user.displayName)
+            }
+            Button("View Profile") { viewModel.showProfileView = true }
+            Divider()
+            Button("Sign Out", role: .destructive) { authViewModel.logout() }
+        } label: {
+            Image(systemName: "person.crop.circle")
+                .foregroundStyle(AppTheme.primaryColor)
+        }
+    }
+}
+```
 - [ ] Add confirmation toast overlay:
 ```swift
 .overlay(alignment: .bottom) {
@@ -666,6 +777,11 @@ All identity views use `@EnvironmentObject var viewModel: HomeViewModel` and cal
 | `.onTapGesture` blocks NavigationLink | SwiftUI gesture conflict | Use `.simultaneousGesture(TapGesture().onEnded { })` instead |
 | Personalized content not showing | Attribute key mismatch | Log `personalization.attributes` and check key names (e.g., `imageURL` vs `imageUrl`) |
 | SDK not ready on first render | Async init | Always show mock/fallback content first, replace when SDK responds |
+| `Value of type 'CDP' has no member 'setProfileToAnonymous'` | Wrong API | Use `CdpModule.shared.setProfileToAnonymous()` with `import Cdp` — NOT `SFMCSdk.cdp` |
+| `Value of optional type 'CustomEvent?' must be unwrapped` | `CustomEvent` init returns optional | Use `if let event = CustomEvent(...) { SFMCSdk.track(event: event) }` |
+| Identity data not mapping in Data Cloud | Wrong attribute key names | Use `phoneNumber` (not `phone`), `postalCode` (not `zipCode`), `phoneNumber` in IdentityEvent (not `contactPointPhone`) |
+| `Button` inside `Form` with `listRowBackground` silently swallows taps | SwiftUI Form bug | Move action buttons to `.toolbar { ToolbarItem(placement: .confirmationAction) }` instead |
+| Preferences not appearing in Data Cloud | Sent as custom identity attributes | Use `consentLog` events with `purpose`/`status`/`provider` keys (see Salesforce consent schema docs) |
 
 ---
 
@@ -689,6 +805,20 @@ Filter the Xcode console by `PersonalizationService` to see all events:
 [App] Module 'cdp' init status: success
 [App] CDP consent set to optIn
 [PersonalizationService] SDK is ready.
+
+--- Login / Signup ---
+[PersonalizationService] --- SET USER IDENTITY ---
+[PersonalizationService]   profileId  = user@example.com
+[PersonalizationService]   firstName  = John
+[PersonalizationService]   lastName   = Smith
+[PersonalizationService]   phoneNumber = 555-1234
+[PersonalizationService]   postalCode  = 84095
+[PersonalizationService]   Gender     = Male
+[PersonalizationService]   ✓ identity.edit complete
+[PersonalizationService]   ✓ IdentityEvent tracked: ["contactPointEmail": "user@example.com", ...]
+[PersonalizationService] --- END SET USER IDENTITY ---
+
+--- Personalized Content ---
 [PersonalizationService] --- FETCH DECISIONS ---
 [PersonalizationService]   Requesting points: ["Home_Hero_Test"]
 [PersonalizationService]   Points returned: ["Home_Hero_Test"]
@@ -700,11 +830,488 @@ Filter the Xcode console by `PersonalizationService` to see all events:
 [PersonalizationService] Tracked HomePageView
 [PersonalizationService] Tracked impression: <article-id>
 [PersonalizationService] Tracked click: <article-id>
-[PersonalizationService] --- EMAIL IDENTITY ---
-[PersonalizationService]   profileId = user@example.com
-[PersonalizationService]   IdentityEvent sent: ["contactPointEmail": "user@example.com", ...]
-[PersonalizationService] --- END EMAIL IDENTITY ---
+
+--- Profile Update with Consent ---
+[PersonalizationService] --- SET USER IDENTITY ---
+...
+[PersonalizationService] --- CONSENT PREFERENCE EVENTS ---
+[PersonalizationService]   ✓ consentLog: purpose="Marketing Email" status="Opt In"
+[PersonalizationService]   ✓ consentLog: purpose="Push Notifications" status="Opt Out"
+[PersonalizationService]   ✓ consentLog: purpose="SMS Marketing" status="Opt In"
+[PersonalizationService]   ✓ consentLog: purpose="Weekly Digest" status="Opt In"
+[PersonalizationService]   ✓ consentLog: purpose="Benefit Alerts" status="Opt Out"
+[PersonalizationService] --- END CONSENT PREFERENCE EVENTS ---
+
+--- Logout ---
+[PersonalizationService] ✓ CDP profile set to anonymous (logout)
 ```
+
+---
+
+Now add the new parts for local authentication, login/signup, and profile editing.
+
+---
+
+## PART 11: LOCAL AUTHENTICATION SYSTEM
+
+This adds a local multi-user auth system. Accounts are stored as JSON in the app's Documents directory (plain-text passwords — this is a demo app, not production).
+
+### 11A. User Account Model (`Models/UserAccount.swift`)
+
+```swift
+import Foundation
+
+struct UserAccount: Codable, Identifiable, Equatable {
+    let id: UUID
+    var email: String
+    var password: String
+    var firstName: String
+    var lastName: String
+    var phone: String
+    var zipCode: String
+    var gender: String
+
+    // Marketing preferences
+    var marketingEmailOptIn: Bool
+    var marketingPushOptIn: Bool
+    var marketingSmsOptIn: Bool
+    var weeklyDigestOptIn: Bool
+    var benefitAlertsOptIn: Bool
+
+    var displayName: String {
+        let name = [firstName, lastName].filter { !$0.isEmpty }.joined(separator: " ")
+        return name.isEmpty ? email : name
+    }
+
+    var initials: String {
+        let parts = [firstName, lastName].filter { !$0.isEmpty }
+        if parts.isEmpty { return String(email.prefix(1)).uppercased() }
+        return parts.map { String($0.prefix(1)).uppercased() }.joined()
+    }
+
+    init(id: UUID = UUID(), email: String, password: String,
+         firstName: String = "", lastName: String = "",
+         phone: String = "", zipCode: String = "", gender: String = "",
+         marketingEmailOptIn: Bool = false, marketingPushOptIn: Bool = false,
+         marketingSmsOptIn: Bool = false, weeklyDigestOptIn: Bool = false,
+         benefitAlertsOptIn: Bool = false) {
+        self.id = id
+        self.email = email
+        self.password = password
+        self.firstName = firstName
+        self.lastName = lastName
+        self.phone = phone
+        self.zipCode = zipCode
+        self.gender = gender
+        self.marketingEmailOptIn = marketingEmailOptIn
+        self.marketingPushOptIn = marketingPushOptIn
+        self.marketingSmsOptIn = marketingSmsOptIn
+        self.weeklyDigestOptIn = weeklyDigestOptIn
+        self.benefitAlertsOptIn = benefitAlertsOptIn
+    }
+}
+```
+
+### 11B. Auth Service (`Services/AuthService.swift`)
+
+```swift
+import Foundation
+
+final class AuthService {
+    static let shared = AuthService()
+
+    private var accounts: [UserAccount] = []
+    private let fileURL: URL
+
+    enum AuthError: LocalizedError {
+        case emailAlreadyExists, invalidCredentials, emptyEmail, emptyPassword
+        var errorDescription: String? {
+            switch self {
+            case .emailAlreadyExists: return "An account with this email already exists."
+            case .invalidCredentials: return "Invalid email or password."
+            case .emptyEmail:         return "Please enter an email address."
+            case .emptyPassword:      return "Please enter a password."
+            }
+        }
+    }
+
+    private init() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        fileURL = docs.appendingPathComponent("user_accounts.json")
+        loadAccounts()
+    }
+
+    func signup(email: String, password: String,
+                firstName: String = "", lastName: String = "",
+                gender: String = "") throws -> UserAccount {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmedEmail.isEmpty else { throw AuthError.emptyEmail }
+        guard !password.isEmpty else { throw AuthError.emptyPassword }
+        guard !accounts.contains(where: { $0.email == trimmedEmail }) else {
+            throw AuthError.emailAlreadyExists
+        }
+        let account = UserAccount(email: trimmedEmail, password: password,
+                                   firstName: firstName, lastName: lastName,
+                                   gender: gender)
+        accounts.append(account)
+        saveAccounts()
+        return account
+    }
+
+    func login(email: String, password: String) throws -> UserAccount {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !trimmedEmail.isEmpty else { throw AuthError.emptyEmail }
+        guard !password.isEmpty else { throw AuthError.emptyPassword }
+        guard let account = accounts.first(where: {
+            $0.email == trimmedEmail && $0.password == password
+        }) else { throw AuthError.invalidCredentials }
+        return account
+    }
+
+    func account(forEmail email: String) -> UserAccount? {
+        accounts.first { $0.email == email.lowercased() }
+    }
+
+    func updateAccount(_ updated: UserAccount) {
+        guard let index = accounts.firstIndex(where: { $0.id == updated.id }) else { return }
+        accounts[index] = updated
+        saveAccounts()
+    }
+
+    private func loadAccounts() {
+        guard let data = try? Data(contentsOf: fileURL),
+              let decoded = try? JSONDecoder().decode([UserAccount].self, from: data)
+        else { return }
+        accounts = decoded
+    }
+
+    private func saveAccounts() {
+        guard let data = try? JSONEncoder().encode(accounts) else { return }
+        try? data.write(to: fileURL)
+    }
+}
+```
+
+### 11C. Auth ViewModel (`ViewModels/AuthViewModel.swift`)
+
+```swift
+import SwiftUI
+import Combine
+
+@MainActor
+final class AuthViewModel: ObservableObject {
+    @Published var isLoggedIn = false
+    @Published var currentUser: UserAccount?
+    @Published var errorMessage: String?
+
+    private let authService = AuthService.shared
+    private let personalizationService = PersonalizationService.shared
+    private let loggedInEmailKey = "loggedInUserEmail"
+
+    init() { restoreSession() }
+
+    func login(email: String, password: String) {
+        do {
+            let account = try authService.login(email: email, password: password)
+            setCurrentUser(account)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func signup(email: String, password: String,
+                firstName: String, lastName: String, gender: String = "") {
+        do {
+            let account = try authService.signup(email: email, password: password,
+                                                  firstName: firstName, lastName: lastName,
+                                                  gender: gender)
+            setCurrentUser(account)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func logout() {
+        personalizationService.clearIdentity()
+        currentUser = nil
+        isLoggedIn = false
+        UserDefaults.standard.removeObject(forKey: loggedInEmailKey)
+    }
+
+    func updateProfile(_ updated: UserAccount) {
+        authService.updateAccount(updated)
+        currentUser = updated
+        UserDefaults.standard.set(updated.email, forKey: loggedInEmailKey)
+        personalizationService.setUserIdentity(user: updated)
+        personalizationService.trackPreferenceUpdate(user: updated)
+    }
+
+    private func setCurrentUser(_ account: UserAccount) {
+        currentUser = account
+        isLoggedIn = true
+        errorMessage = nil
+        UserDefaults.standard.set(account.email, forKey: loggedInEmailKey)
+        personalizationService.setUserIdentity(user: account)
+    }
+
+    private func restoreSession() {
+        guard let email = UserDefaults.standard.string(forKey: loggedInEmailKey),
+              let account = authService.account(forEmail: email) else { return }
+        currentUser = account
+        isLoggedIn = true
+    }
+}
+```
+
+---
+
+## PART 12: LOGIN & SIGNUP VIEWS
+
+### 12A. Login View (`Views/LoginView.swift`)
+
+```swift
+import SwiftUI
+
+struct LoginView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var email = ""
+    @State private var password = ""
+    @State private var showSignup = false
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 32) {
+                Spacer()
+                // Brand header
+                VStack(spacing: 8) {
+                    Image(systemName: "heart.text.square.fill")
+                        .font(.system(size: 64))
+                        .foregroundStyle(AppTheme.primaryColor)
+                    Text("<YOUR-APP-NAME>")
+                        .font(.title.bold())
+                    Text("Your benefits companion")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Login form
+                VStack(spacing: 16) {
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .autocapitalization(.none)
+                        .keyboardType(.emailAddress)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    SecureField("Password", text: $password)
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .padding(.horizontal)
+
+                if let error = authViewModel.errorMessage {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
+
+                Button {
+                    authViewModel.login(email: email, password: password)
+                } label: {
+                    Text("Sign In")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(AppTheme.primaryColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.horizontal)
+
+                Button("Don't have an account? Create one") { showSignup = true }
+                    .font(.subheadline)
+
+                Spacer()
+            }
+            .sheet(isPresented: $showSignup) {
+                SignupView().environmentObject(authViewModel)
+            }
+        }
+    }
+}
+```
+
+### 12B. Signup View (`Views/SignupView.swift`)
+
+```swift
+import SwiftUI
+
+struct SignupView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var email = ""
+    @State private var password = ""
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var gender = ""
+
+    private let genderOptions = ["", "Male", "Female", "Non-binary", "Prefer not to say"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Account (Required)") {
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .autocapitalization(.none)
+                    SecureField("Password", text: $password)
+                }
+                Section("Profile (Optional)") {
+                    TextField("First Name", text: $firstName)
+                    TextField("Last Name", text: $lastName)
+                    Picker("Gender", selection: $gender) {
+                        ForEach(genderOptions, id: \.self) { option in
+                            Text(option.isEmpty ? "Select" : option).tag(option)
+                        }
+                    }
+                }
+                if let error = authViewModel.errorMessage {
+                    Section { Text(error).foregroundStyle(.red) }
+                }
+                Section {
+                    Button("Create Account") {
+                        authViewModel.signup(email: email, password: password,
+                                             firstName: firstName, lastName: lastName,
+                                             gender: gender)
+                        if authViewModel.isLoggedIn { dismiss() }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .foregroundStyle(.white)
+                    .listRowBackground(AppTheme.primaryColor)
+                }
+            }
+            .navigationTitle("Create Account")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+}
+```
+
+---
+
+## PART 13: PROFILE EDITING & CONSENT PREFERENCES
+
+### ProfileView (`Views/ProfileView.swift`)
+
+Full-screen profile editor with personal info, gender, and marketing preference toggles. On save, it calls `authViewModel.updateProfile()` which sends both identity + consent events.
+
+```swift
+import SwiftUI
+
+struct ProfileView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var phone = ""
+    @State private var zipCode = ""
+    @State private var gender = ""
+
+    // Preferences
+    @State private var marketingEmailOptIn = false
+    @State private var marketingPushOptIn = false
+    @State private var marketingSmsOptIn = false
+    @State private var weeklyDigestOptIn = false
+    @State private var benefitAlertsOptIn = false
+
+    private let genderOptions = ["", "Male", "Female", "Non-binary", "Prefer not to say"]
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                // Avatar header
+                Section {
+                    HStack {
+                        Spacer()
+                        ZStack {
+                            Circle().fill(AppTheme.primaryColor).frame(width: 80, height: 80)
+                            Text(authViewModel.currentUser?.initials ?? "?")
+                                .font(.title.bold()).foregroundStyle(.white)
+                        }
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                }
+                Section("Personal Information") {
+                    TextField("First Name", text: $firstName)
+                    TextField("Last Name", text: $lastName)
+                    Picker("Gender", selection: $gender) {
+                        ForEach(genderOptions, id: \.self) { Text($0.isEmpty ? "Select" : $0).tag($0) }
+                    }
+                }
+                Section("Contact Information") {
+                    HStack { Text("Email"); Spacer()
+                        Text(authViewModel.currentUser?.email ?? "").foregroundStyle(.secondary)
+                    }
+                    TextField("Phone", text: $phone).keyboardType(.phonePad)
+                    TextField("Zip Code", text: $zipCode).keyboardType(.numberPad)
+                }
+                Section("Marketing Preferences") {
+                    Toggle("Marketing Emails", isOn: $marketingEmailOptIn)
+                    Toggle("Push Notifications", isOn: $marketingPushOptIn)
+                    Toggle("SMS Marketing", isOn: $marketingSmsOptIn)
+                    Toggle("Weekly Digest", isOn: $weeklyDigestOptIn)
+                    Toggle("Benefit Alerts", isOn: $benefitAlertsOptIn)
+                }
+            }
+            .navigationTitle("Profile")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { saveProfile() }.fontWeight(.semibold)
+                }
+            }
+            .onAppear { loadCurrentValues() }
+        }
+    }
+
+    private func loadCurrentValues() {
+        guard let user = authViewModel.currentUser else { return }
+        firstName = user.firstName; lastName = user.lastName
+        phone = user.phone; zipCode = user.zipCode; gender = user.gender
+        marketingEmailOptIn = user.marketingEmailOptIn
+        marketingPushOptIn = user.marketingPushOptIn
+        marketingSmsOptIn = user.marketingSmsOptIn
+        weeklyDigestOptIn = user.weeklyDigestOptIn
+        benefitAlertsOptIn = user.benefitAlertsOptIn
+    }
+
+    private func saveProfile() {
+        guard var user = authViewModel.currentUser else { return }
+        user.firstName = firstName.trimmingCharacters(in: .whitespaces)
+        user.lastName = lastName.trimmingCharacters(in: .whitespaces)
+        user.phone = phone.trimmingCharacters(in: .whitespaces)
+        user.zipCode = zipCode.trimmingCharacters(in: .whitespaces)
+        user.gender = gender
+        user.marketingEmailOptIn = marketingEmailOptIn
+        user.marketingPushOptIn = marketingPushOptIn
+        user.marketingSmsOptIn = marketingSmsOptIn
+        user.weeklyDigestOptIn = weeklyDigestOptIn
+        user.benefitAlertsOptIn = benefitAlertsOptIn
+        authViewModel.updateProfile(user)
+        dismiss()
+    }
+}
+```
+
+> **Important SwiftUI pattern**: The Save button is in `.toolbar` (not inline in the Form). A `Button` inside a `Form` `Section` with `listRowBackground` will silently swallow taps — this is a known SwiftUI bug. Always use toolbar buttons for Form save actions.
+
+> **Data flow on save**: `saveProfile()` → `authViewModel.updateProfile(user)` → `personalizationService.setUserIdentity(user)` (identity event) + `personalizationService.trackPreferenceUpdate(user)` (5 consent events)
 
 ---
 
@@ -715,15 +1322,21 @@ Filter the Xcode console by `PersonalizationService` to see all events:
 | 1 | `Config/SDKConfig.swift` | Create | Salesforce credentials & point names |
 | 2 | `Config/Theme.swift` | Create | Brand colors |
 | 3 | `App/AppDelegate.swift` | Create | SDK initialization + consent |
-| 4 | `App/YourApp.swift` | Modify | Add `@UIApplicationDelegateAdaptor` + `@StateObject` |
+| 4 | `App/YourApp.swift` | Modify | Conditional root view (auth gate), inject `AuthViewModel` |
 | 5 | `Models/Article.swift` | Create/Modify | Content data model |
 | 6 | `Models/PersonalizationDecision.swift` | Create | SDK response parser |
-| 7 | `Services/PersonalizationService.swift` | Create | SDK wrapper (fetch + events + identity) |
-| 8 | `ViewModels/HomeViewModel.swift` | Create/Modify | State management + event pass-throughs |
-| 9 | `Views/HomeView.swift` | Modify | Wire NavigationStack, sheets, toolbar, toast |
-| 10 | `Views/FeaturedStoryView.swift` | Create/Modify | Hero banner with AsyncImage + tracking |
-| 11 | `Views/ArticleDetailView.swift` | Create | Detail page with tracking on appear |
-| 12 | `Views/EmailSignupView.swift` | Create | Email capture footer |
-| 13 | `Views/SMSAlertBannerView.swift` | Create | SMS opt-in banner |
-| 14 | `Views/PhoneSignupSheet.swift` | Create | Phone capture sheet |
-| 15 | `Views/ProfileSignupSheet.swift` | Create | Full profile capture sheet |
+| 7 | `Models/UserAccount.swift` | Create | Local user account model with preferences |
+| 8 | `Services/PersonalizationService.swift` | Create | SDK wrapper (fetch + events + identity + consent) |
+| 9 | `Services/AuthService.swift` | Create | Local JSON-based account storage |
+| 10 | `ViewModels/HomeViewModel.swift` | Create/Modify | State management + event pass-throughs + `resetContent()` |
+| 11 | `ViewModels/AuthViewModel.swift` | Create | Login/logout/signup state + identity lifecycle |
+| 12 | `Views/HomeView.swift` | Modify | Wire NavigationStack, auth menu, sheets, toast |
+| 13 | `Views/LoginView.swift` | Create | Login screen with email/password + Create Account link |
+| 14 | `Views/SignupView.swift` | Create | Account creation form with gender picker |
+| 15 | `Views/ProfileView.swift` | Create | Profile editor with gender + 5 marketing preference toggles |
+| 16 | `Views/FeaturedStoryView.swift` | Create/Modify | Hero banner with AsyncImage + tracking |
+| 17 | `Views/ArticleDetailView.swift` | Create | Detail page with tracking on appear |
+| 18 | `Views/EmailSignupView.swift` | Create | Email capture footer |
+| 19 | `Views/SMSAlertBannerView.swift` | Create | SMS opt-in banner |
+| 20 | `Views/PhoneSignupSheet.swift` | Create | Phone capture sheet |
+| 21 | `Views/ProfileSignupSheet.swift` | Create | Full profile capture sheet |

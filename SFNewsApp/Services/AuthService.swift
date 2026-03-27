@@ -53,7 +53,8 @@ final class AuthService {
 
     @discardableResult
     func signup(email: String, password: String,
-                firstName: String = "", lastName: String = "") throws -> UserAccount {
+                firstName: String = "", lastName: String = "",
+                gender: String = "") throws -> UserAccount {
         let trimmedEmail = email.trimmingCharacters(in: .whitespaces).lowercased()
         let trimmedPassword = password.trimmingCharacters(in: .whitespaces)
 
@@ -68,7 +69,15 @@ final class AuthService {
             email: trimmedEmail,
             password: trimmedPassword,
             firstName: firstName.trimmingCharacters(in: .whitespaces),
-            lastName: lastName.trimmingCharacters(in: .whitespaces)
+            lastName: lastName.trimmingCharacters(in: .whitespaces),
+            phone: "",
+            zipCode: "",
+            gender: gender,
+            marketingEmailOptIn: false,
+            marketingPushOptIn: false,
+            marketingSmsOptIn: false,
+            weeklyDigestOptIn: false,
+            benefitAlertsOptIn: false
         )
         accounts.append(account)
         saveAccounts()
@@ -90,6 +99,14 @@ final class AuthService {
         }
         print("[AuthService] Logged in: \(trimmedEmail)")
         return account
+    }
+
+    /// Updates an existing account in-place and persists.
+    func updateAccount(_ updated: UserAccount) {
+        guard let index = accounts.firstIndex(where: { $0.id == updated.id }) else { return }
+        accounts[index] = updated
+        saveAccounts()
+        print("[AuthService] Updated account for \(updated.email)")
     }
 
     func allAccounts() -> [UserAccount] { accounts }

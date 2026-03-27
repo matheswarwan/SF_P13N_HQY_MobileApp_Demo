@@ -143,6 +143,9 @@ final class PersonalizationService {
         print("[PersonalizationService]   profileId  = \(user.email)")
         print("[PersonalizationService]   firstName  = \(user.firstName)")
         print("[PersonalizationService]   lastName   = \(user.lastName)")
+        print("[PersonalizationService]   phoneNumber = \(user.phone)")
+        print("[PersonalizationService]   postalCode  = \(user.zipCode)")
+        print("[PersonalizationService]   Gender     = \(user.gender)")
 
         SFMCSdk.identity.edit { modifier in
             modifier.profileId = user.email
@@ -153,6 +156,15 @@ final class PersonalizationService {
             if !user.lastName.isEmpty {
                 modifier.addAttribute(key: "lastName", value: user.lastName)
             }
+            if !user.phone.isEmpty {
+                modifier.addAttribute(key: "phoneNumber", value: user.phone)
+            }
+            if !user.zipCode.isEmpty {
+                modifier.addAttribute(key: "postalCode", value: user.zipCode)
+            }
+            if !user.gender.isEmpty {
+                modifier.addAttribute(key: "Gender", value: user.gender)
+            }
             return modifier
         }
         print("[PersonalizationService]   ✓ identity.edit complete")
@@ -160,6 +172,9 @@ final class PersonalizationService {
         var attributes: [String: Any] = ["contactPointEmail": user.email, "source": "local_auth_login"]
         if !user.firstName.isEmpty { attributes["firstName"] = user.firstName }
         if !user.lastName.isEmpty  { attributes["lastName"]  = user.lastName  }
+        if !user.phone.isEmpty     { attributes["phoneNumber"] = user.phone }
+        if !user.zipCode.isEmpty   { attributes["postalCode"] = user.zipCode  }
+        if !user.gender.isEmpty    { attributes["Gender"]    = user.gender    }
         let event = IdentityEvent(attributes: attributes)
         SFMCSdk.track(event: event)
         print("[PersonalizationService]   ✓ IdentityEvent tracked: \(attributes)")
@@ -211,16 +226,16 @@ final class PersonalizationService {
         }
 
         print("[PersonalizationService] --- PHONE IDENTITY EVENT ---")
-        print("[PersonalizationService]   Setting attribute: phone = \(phone)")
+        print("[PersonalizationService]   Setting attribute: phoneNumber = \(phone)")
 
         SFMCSdk.identity.edit { modifier in
-            modifier.addAttribute(key: "phone", value: phone)
+            modifier.addAttribute(key: "phoneNumber", value: phone)
             return modifier
         }
         print("[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit")
 
         let attributes: [String: Any] = [
-            "contactPointPhone": phone,
+            "phoneNumber": phone,
             "source": "sms_signup_sheet"
         ]
         let event = IdentityEvent(attributes: attributes)
@@ -239,33 +254,69 @@ final class PersonalizationService {
         print("[PersonalizationService] --- FULL PROFILE IDENTITY EVENT ---")
         print("[PersonalizationService]   Setting profileId = \(email)")
         print("[PersonalizationService]   Setting attribute: email     = \(email)")
-        print("[PersonalizationService]   Setting attribute: phone     = \(phone)")
-        print("[PersonalizationService]   Setting attribute: firstName = \(firstName)")
-        print("[PersonalizationService]   Setting attribute: lastName  = \(lastName)")
-        print("[PersonalizationService]   Setting attribute: zipCode   = \(zipCode)")
+        print("[PersonalizationService]   Setting attribute: phoneNumber = \(phone)")
+        print("[PersonalizationService]   Setting attribute: firstName   = \(firstName)")
+        print("[PersonalizationService]   Setting attribute: lastName    = \(lastName)")
+        print("[PersonalizationService]   Setting attribute: postalCode  = \(zipCode)")
 
         SFMCSdk.identity.edit { modifier in
             modifier.profileId = email
             modifier.addAttribute(key: "email", value: email)
-            modifier.addAttribute(key: "phone", value: phone)
+            modifier.addAttribute(key: "phoneNumber", value: phone)
             modifier.addAttribute(key: "firstName", value: firstName)
             modifier.addAttribute(key: "lastName", value: lastName)
-            modifier.addAttribute(key: "zipCode", value: zipCode)
+            modifier.addAttribute(key: "postalCode", value: zipCode)
             return modifier
         }
         print("[PersonalizationService]   ✓ Identity profile updated via SFMCSdk.identity.edit")
 
         let attributes: [String: Any] = [
             "contactPointEmail": email,
-            "contactPointPhone": phone,
+            "phoneNumber": phone,
             "firstName": firstName,
             "lastName": lastName,
-            "zipCode": zipCode,
+            "postalCode": zipCode,
             "source": "profile_signup_sheet"
         ]
         let event = IdentityEvent(attributes: attributes)
         SFMCSdk.track(event: event)
         print("[PersonalizationService]   ✓ IdentityEvent tracked with attributes: \(attributes)")
         print("[PersonalizationService] --- END FULL PROFILE IDENTITY ---")
+    }
+
+    // MARK: - Preference / Consent Tracking
+
+    /// Sends consent events for each marketing preference using the consentLog schema.
+    /// Each preference maps to: purpose (what), status (Opt In / Opt Out), provider (app name).
+    func trackPreferenceUpdate(user: UserAccount) {
+        guard isSDKReady else {
+            print("[PersonalizationService] ⚠️ SDK not ready — skipping PreferenceUpdate event")
+            return
+        }
+
+        print("[PersonalizationService] --- CONSENT PREFERENCE EVENTS ---")
+
+        let preferences: [(purpose: String, optedIn: Bool)] = [
+            ("Marketing Email",    user.marketingEmailOptIn),
+            ("Push Notifications", user.marketingPushOptIn),
+            ("SMS Marketing",      user.marketingSmsOptIn),
+            ("Weekly Digest",      user.weeklyDigestOptIn),
+            ("Benefit Alerts",     user.benefitAlertsOptIn),
+        ]
+
+        for pref in preferences {
+            let status = pref.optedIn ? "Opt In" : "Opt Out"
+            let attributes: [String: Any] = [
+                "purpose": pref.purpose,
+                "status": status,
+                "provider": "HealthEquity Mobile App"
+            ]
+            if let event = CustomEvent(name: "consentLog", attributes: attributes) {
+                SFMCSdk.track(event: event)
+                print("[PersonalizationService]   ✓ consentLog: purpose=\"\(pref.purpose)\" status=\"\(status)\"")
+            }
+        }
+
+        print("[PersonalizationService] --- END CONSENT PREFERENCE EVENTS ---")
     }
 }

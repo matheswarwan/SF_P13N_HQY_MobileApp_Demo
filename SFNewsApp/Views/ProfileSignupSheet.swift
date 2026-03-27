@@ -66,7 +66,7 @@ struct ProfileSignupSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        viewModel.showProfileSignupSheet = false
+                        viewModel.showProfileView = false
                     }
                 }
             }

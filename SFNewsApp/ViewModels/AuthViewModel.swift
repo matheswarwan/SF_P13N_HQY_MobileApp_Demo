@@ -54,12 +54,13 @@ final class AuthViewModel: ObservableObject {
 
     // MARK: - Signup
 
-    func signup(email: String, password: String, firstName: String, lastName: String) {
+    func signup(email: String, password: String, firstName: String, lastName: String, gender: String = "") {
         errorMessage = nil
         do {
             let account = try authService.signup(
                 email: email, password: password,
-                firstName: firstName, lastName: lastName
+                firstName: firstName, lastName: lastName,
+                gender: gender
             )
             setCurrentUser(account)
         } catch {
@@ -75,6 +76,17 @@ final class AuthViewModel: ObservableObject {
         UserDefaults.standard.removeObject(forKey: loggedInEmailKey)
         currentUser = nil
         isLoggedIn = false
+    }
+
+    // MARK: - Profile Update
+
+    func updateProfile(_ updated: UserAccount) {
+        authService.updateAccount(updated)
+        currentUser = updated
+        UserDefaults.standard.set(updated.email, forKey: loggedInEmailKey)
+        personalizationService.setUserIdentity(user: updated)
+        personalizationService.trackPreferenceUpdate(user: updated)
+        print("[AuthViewModel] Updated profile for \(updated.email)")
     }
 
     // MARK: - Private

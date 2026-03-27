@@ -48,9 +48,9 @@ struct HomeView: View {
                         }
                         Divider()
                         Button {
-                            viewModel.showProfileSignupSheet = true
+                            viewModel.showProfileView = true
                         } label: {
-                            Label("Update Profile", systemImage: "person.crop.circle")
+                            Label("View Profile", systemImage: "person.crop.circle")
                         }
                         Button(role: .destructive) {
                             authViewModel.logout()
@@ -67,9 +67,9 @@ struct HomeView: View {
                 PhoneSignupSheet()
                     .environmentObject(viewModel)
             }
-            .sheet(isPresented: $viewModel.showProfileSignupSheet) {
-                ProfileSignupSheet()
-                    .environmentObject(viewModel)
+            .sheet(isPresented: $viewModel.showProfileView) {
+                ProfileView()
+                    .environmentObject(authViewModel)
             }
             .overlay(alignment: .bottom) {
                 if let message = viewModel.identityConfirmationMessage {

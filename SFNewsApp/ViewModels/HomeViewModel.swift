@@ -25,7 +25,7 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Identity UI State
 
     @Published var showPhoneSignupSheet = false
-    @Published var showProfileSignupSheet = false
+    @Published var showProfileView = false
     @Published var identityConfirmationMessage: String? = nil
 
     // MARK: - Dependencies
@@ -83,7 +83,7 @@ final class HomeViewModel: ObservableObject {
 
     func submitProfile(email: String, phone: String, firstName: String, lastName: String, zipCode: String) {
         service.trackFullProfileIdentity(email: email, phone: phone, firstName: firstName, lastName: lastName, zipCode: zipCode)
-        showProfileSignupSheet = false
+        showProfileView = false
         showConfirmation("Profile created!")
     }
 

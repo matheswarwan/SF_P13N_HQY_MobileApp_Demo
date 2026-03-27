@@ -9,10 +9,12 @@
 /* Begin PBXBuildFile section */
 		941E39562F71E0FA00673F05 /* Cdp in Frameworks */ = {isa = PBXBuildFile; productRef = 941E39552F71E0FA00673F05 /* Cdp */; };
 		941E39592F71E11700673F05 /* Personalization in Frameworks */ = {isa = PBXBuildFile; productRef = 941E39582F71E11700673F05 /* Personalization */; };
+		94A8C69F2F76365E0030AEA2 /* SCHEMA_GAPS.md in Resources */ = {isa = PBXBuildFile; fileRef = 94A8C69E2F76365E0030AEA2 /* SCHEMA_GAPS.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		941E39252F71DF2F00673F05 /* SFNewsApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFNewsApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		94A8C69E2F76365E0030AEA2 /* SCHEMA_GAPS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SCHEMA_GAPS.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -41,6 +43,7 @@
 			children = (
 				941E39272F71DF2F00673F05 /* SFNewsApp */,
 				941E39262F71DF2F00673F05 /* Products */,
+				94A8C69E2F76365E0030AEA2 /* SCHEMA_GAPS.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,6 +125,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				94A8C69F2F76365E0030AEA2 /* SCHEMA_GAPS.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -10,6 +10,9 @@ struct SignupView: View {
     @State private var password = ""
     @State private var firstName = ""
     @State private var lastName = ""
+    @State private var gender = ""
+
+    private let genderOptions = ["", "Male", "Female", "Non-binary", "Prefer not to say"]
 
     private var isFormValid: Bool {
         !email.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -37,6 +40,11 @@ struct SignupView: View {
                         .textContentType(.givenName)
                     TextField("Last Name", text: $lastName)
                         .textContentType(.familyName)
+                    Picker("Gender", selection: $gender) {
+                        ForEach(genderOptions, id: \.self) { option in
+                            Text(option.isEmpty ? "Select" : option).tag(option)
+                        }
+                    }
                 }
 
                 if let error = authViewModel.errorMessage {
@@ -53,7 +61,8 @@ struct SignupView: View {
                             email: email,
                             password: password,
                             firstName: firstName,
-                            lastName: lastName
+                            lastName: lastName,
+                            gender: gender
                         )
                     }
                     .frame(maxWidth: .infinity)
