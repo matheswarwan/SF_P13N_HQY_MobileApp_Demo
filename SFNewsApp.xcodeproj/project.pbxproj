@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		941E39562F71E0FA00673F05 /* Cdp in Frameworks */ = {isa = PBXBuildFile; productRef = 941E39552F71E0FA00673F05 /* Cdp */; };
 		941E39592F71E11700673F05 /* Personalization in Frameworks */ = {isa = PBXBuildFile; productRef = 941E39582F71E11700673F05 /* Personalization */; };
+		946D13132F968BC70088EB8C /* mobile-push-initial-discussion.md in Resources */ = {isa = PBXBuildFile; fileRef = 946D13122F968BC60088EB8C /* mobile-push-initial-discussion.md */; };
 		94A8C69F2F76365E0030AEA2 /* SCHEMA_GAPS.md in Resources */ = {isa = PBXBuildFile; fileRef = 94A8C69E2F76365E0030AEA2 /* SCHEMA_GAPS.md */; };
 		94E672912F7C4565004D356F /* EVENT_TRACKING_GUIDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 94E672902F7C4565004D356F /* EVENT_TRACKING_GUIDE.md */; };
 		94F9E8022F803B0800830D23 /* TECHNICAL_QA_SHOWCASE.md in Resources */ = {isa = PBXBuildFile; fileRef = 94F9E8012F803B0800830D23 /* TECHNICAL_QA_SHOWCASE.md */; };
@@ -16,6 +17,7 @@
 
 /* Begin PBXFileReference section */
 		941E39252F71DF2F00673F05 /* SFNewsApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SFNewsApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		946D13122F968BC60088EB8C /* mobile-push-initial-discussion.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = "mobile-push-initial-discussion.md"; sourceTree = "<group>"; };
 		94A8C69E2F76365E0030AEA2 /* SCHEMA_GAPS.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SCHEMA_GAPS.md; sourceTree = "<group>"; };
 		94E672902F7C4565004D356F /* EVENT_TRACKING_GUIDE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = EVENT_TRACKING_GUIDE.md; sourceTree = "<group>"; };
 		94F9E8012F803B0800830D23 /* TECHNICAL_QA_SHOWCASE.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = TECHNICAL_QA_SHOWCASE.md; sourceTree = "<group>"; };
@@ -51,6 +53,7 @@
 				94E672902F7C4565004D356F /* EVENT_TRACKING_GUIDE.md */,
 				94F9E8002F7EDDA000830D23 /* Frameworks */,
 				94F9E8012F803B0800830D23 /* TECHNICAL_QA_SHOWCASE.md */,
+				946D13122F968BC60088EB8C /* mobile-push-initial-discussion.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -141,6 +144,7 @@
 			files = (
 				94E672912F7C4565004D356F /* EVENT_TRACKING_GUIDE.md in Resources */,
 				94A8C69F2F76365E0030AEA2 /* SCHEMA_GAPS.md in Resources */,
+				946D13132F968BC70088EB8C /* mobile-push-initial-discussion.md in Resources */,
 				94F9E8022F803B0800830D23 /* TECHNICAL_QA_SHOWCASE.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
